@@ -5990,9 +5990,12 @@ int sched_isolate_cpu(int cpu)
 	cpumask_t avail_cpus;
 	int ret_code = 0;
 	u64 start_time = 0;
+	bool trace = false;
 
-	if (trace_sched_isolate_enabled())
+	if (trace_sched_isolate_enabled()) {
+		trace = true;
 		start_time = sched_clock();
+	}
 
 	cpu_maps_update_begin();
 
@@ -6043,7 +6046,8 @@ int sched_isolate_cpu(int cpu)
 
 out:
 	cpu_maps_update_done();
-	trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
+	if (trace)
+		trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
 			    start_time, 1);
 	return ret_code;
 }
@@ -6059,9 +6063,12 @@ int sched_unisolate_cpu_unlocked(int cpu)
 	int ret_code = 0;
 	struct rq *rq = cpu_rq(cpu);
 	u64 start_time = 0;
+	bool trace = false;
 
-	if (trace_sched_isolate_enabled())
+	if (trace_sched_isolate_enabled()) {
+		trace = true;
 		start_time = sched_clock();
+	}
 
 	if (!cpu_isolation_vote[cpu]) {
 		ret_code = -EINVAL;
@@ -6092,7 +6099,8 @@ int sched_unisolate_cpu_unlocked(int cpu)
 	}
 
 out:
-	trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
+	if (trace)
+		trace_sched_isolate(cpu, cpumask_bits(cpu_isolated_mask)[0],
 			    start_time, 0);
 	return ret_code;
 }
