@@ -291,6 +291,11 @@ config INPUT_BOOST_FREQ_PERF
 
 endif
 
+config FINGERPRINT_BOOST
+	bool "Fingerprint Boost"
+	help
+	  Boosts available CPUs to max frequency on fingerprint sensor input.
+
 comment "CPU frequency scaling drivers"
 
 config CPUFREQ_DT
@@ -307,6 +312,7 @@ config CPUFREQ_DT
 	  If in doubt, say N.
 
 if X86
+
 source "drivers/cpufreq/Kconfig.x86"
 endif
 
