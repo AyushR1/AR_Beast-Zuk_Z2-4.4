@@ -63,6 +63,11 @@ ifeq ($(CONFIG_COMPAT_VDSO), y)
     export CONFIG_VDSO32 := y
     vdso32 := -DCONFIG_VDSO32=1
   endif
+
+KBUILD_CFLAGS	+= $(call cc-option,-march=armv8-a+crypto+crc,)
+KBUILD_CFLAGS	+= $(call cc-option,-mcpu=kryo,)
+KBUILD_CFLAGS	+= $(call cc-option,-mtune=cortex-a73.cortex-a53,)
+
 endif
 
 KBUILD_CFLAGS	+= -mgeneral-regs-only
