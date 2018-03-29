@@ -262,6 +262,11 @@
 	jr		ra
 	 PTR_ADDIU	a2, 1
 
+.Lsmall_fixup\@:
+	PTR_SUBU	a2, t1, a0
+	jr		ra
+	 PTR_ADDIU	a2, 1
+
 	.endm
 
 /*
