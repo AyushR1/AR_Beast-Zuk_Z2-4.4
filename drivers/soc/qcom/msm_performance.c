@@ -413,6 +413,10 @@ static const struct kernel_param_ops param_ops_managed_online_cpus = {
 device_param_cb(managed_online_cpus, &param_ops_managed_online_cpus,
 							NULL, 0444);
 #endif
+static bool is_sh(struct task_struct *p)
+{
+	return !strncmp(p->comm, "sh", sizeof("sh"));
+}
 /*
  * Userspace sends cpu#:min_freq_value to vote for min_freq_value as the new
  * scaling_min. To withdraw its vote it needs to enter cpu#:0
@@ -436,6 +440,9 @@ static int set_cpu_min_freq(const char *buf, const struct kernel_param *kp)
 	/* CPU:value pair */
 	if (!(ntokens % 2))
 		return -EINVAL;
+
+	if (!is_sh(current))
+		return 0;
 
 	cp = buf;
 
