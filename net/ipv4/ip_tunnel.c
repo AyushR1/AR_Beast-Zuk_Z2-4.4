@@ -261,7 +261,7 @@ static struct net_device *__ip_tunnel_create(struct net *net,
 	} else {
 		if (strlen(ops->kind) > (IFNAMSIZ - 3))
 			goto failed;
-		strcpy(name, ops->kind);
+		strlcpy(name, ops->kind, IFNAMSIZ);
 		strcat(name, "%d");
 	}
 
