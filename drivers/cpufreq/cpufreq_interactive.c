@@ -1033,7 +1033,7 @@ static ssize_t store_hispeed_freq(struct cpufreq_interactive_tunables *tunables,
 	if (is_sh(current))
 		tunables->hispeed_freq = val;
 	else
-		tunables->hispeed_freq = CONFIG_INPUT_BOOST_FREQ_LP;
+		tunables->hispeed_freq = 652800;
 
 	return count;
 }
