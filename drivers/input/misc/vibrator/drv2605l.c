@@ -182,7 +182,7 @@ static void play_effect(struct drv2605l_data *haptics)
 	drv2605l_change_mode(haptics, WORK_IDLE, DEV_STANDBY);
 	switch_set_state(&haptics->sw_dev, SW_STATE_IDLE);
 	haptics->is_playing = NO;
-	wake_unlock(&haptics->wk_lock);
+	__pm_relax(&haptics->wksrc);
 }
 
 static void play_pattern_rtp(struct drv2605l_data *haptics)
@@ -193,7 +193,7 @@ static void play_pattern_rtp(struct drv2605l_data *haptics)
 			drv2605l_change_mode(haptics, WORK_IDLE, DEV_STANDBY);
 			haptics->is_playing = NO;
 			switch_set_state(&haptics->sw_dev, SW_STATE_IDLE);
-			wake_unlock(&haptics->wk_lock);
+			__pm_relax(&haptics->wksrc);
 		} else {
 			hrtimer_start(&haptics->timer, ns_to_ktime((u64)haptics->silience_time * NSEC_PER_MSEC), HRTIMER_MODE_REL);
 		}
@@ -220,7 +220,7 @@ static void play_seq_rtp(struct drv2605l_data *haptics)
 		drv2605l_change_mode(haptics, WORK_IDLE, DEV_STANDBY);
 		haptics->is_playing = NO;
 		switch_set_state(&haptics->sw_dev, SW_STATE_IDLE);
-		wake_unlock(&haptics->wk_lock);
+		__pm_relax(&haptics->wksrc);
 	}
 }
 
@@ -231,7 +231,7 @@ static void vibrator_off(struct drv2605l_data *haptics)
 		drv2605l_set_go_bit(haptics, STOP);
 		drv2605l_change_mode(haptics, WORK_IDLE, DEV_STANDBY);
 		switch_set_state(&haptics->sw_dev, SW_STATE_IDLE);
-		wake_unlock(&haptics->wk_lock);
+		__pm_relax(&haptics->wksrc);
 	}
 }
 
@@ -279,7 +279,7 @@ static void vibrator_enable( struct timed_output_dev *dev, int value)
 	drv2605l_stop(haptics);
 //	printk(KERN_DEBUG"%s:value:%d\n", __FUNCTION__, value);
 	if (value > 0) {
-		wake_lock(&haptics->wk_lock);
+		__pm_stay_awake(&haptics->wksrc);
 
 		drv2605l_change_mode(haptics, WORK_VIBRATOR, DEV_READY);
 		haptics->is_playing = YES;
@@ -457,7 +457,7 @@ static ssize_t dev2605l_write(struct file* filp, const char* buff, size_t len, l
 		memset(&haptics->sequence, 0, WAVEFORM_SEQUENCER_MAX);
 		if (!copy_from_user(&haptics->sequence, &buff[1], len - 1))
 		{
-			wake_lock(&haptics->wk_lock);
+			__pm_stay_awake(&haptics->wksrc);
 
 			haptics->should_stop = NO;
 			drv2605l_change_mode(haptics, WORK_SEQ_PLAYBACK, DEV_IDLE);
@@ -472,7 +472,7 @@ static ssize_t dev2605l_write(struct file* filp, const char* buff, size_t len, l
 		value |= buff[1];
 
 		if (value > 0) {
-			wake_lock(&haptics->wk_lock);
+			__pm_stay_awake(&haptics->wksrc);
 			switch_set_state(&haptics->sw_dev, SW_STATE_RTP_PLAYBACK);
 			haptics->is_playing = YES;
 			value = (value > MAX_TIMEOUT)?MAX_TIMEOUT:value;
@@ -491,7 +491,7 @@ static ssize_t dev2605l_write(struct file* filp, const char* buff, size_t len, l
 		haptics->repeat_times = buff[6];
 
 		if (haptics->vibration_time > 0) {
-			wake_lock(&haptics->wk_lock);
+			__pm_stay_awake(&haptics->wksrc);
 			switch_set_state(&haptics->sw_dev, SW_STATE_RTP_PLAYBACK);
 			haptics->is_playing = YES;
 			if (haptics->repeat_times > 0)
@@ -516,7 +516,7 @@ static ssize_t dev2605l_write(struct file* filp, const char* buff, size_t len, l
 					break;
 				}
 
-				wake_lock(&haptics->wk_lock);
+				__pm_stay_awake(&haptics->wksrc);
 				switch_set_state(&haptics->sw_dev, SW_STATE_RTP_PLAYBACK);
 				drv2605l_change_mode(haptics, WORK_SEQ_RTP_OFF, DEV_IDLE);
 				schedule_work(&haptics->vibrator_work);
@@ -539,14 +539,14 @@ static ssize_t dev2605l_write(struct file* filp, const char* buff, size_t len, l
 		if (fw_buffer != NULL) {
 			fw.size = len-1;
 
-			wake_lock(&haptics->wk_lock);
+			__pm_stay_awake(&haptics->wksrc);
 			result = copy_from_user(fw_buffer, &buff[1], fw.size);
 			if (result == 0) {
 				printk("%s, fwsize=%d, f:%x, l:%x\n", __FUNCTION__, (int)fw.size, buff[1], buff[len-1]);
 				fw.data = (const unsigned char *)fw_buffer;
 				drv2605l_firmware_load(&fw, (void *)haptics);
 			}
-			wake_unlock(&haptics->wk_lock);
+			__pm_relax(&haptics->wksrc);
 
 			kfree(fw_buffer);
 		}
@@ -713,7 +713,7 @@ static int drv2605l_init(struct drv2605l_data *haptics)
 	haptics->timer.function = vibrator_timer_func;
 	INIT_WORK(&haptics->vibrator_work, vibrator_work_routine);
 
-	wake_lock_init(&haptics->wk_lock, WAKE_LOCK_SUSPEND, "vibrator");
+	wakeup_source_init(&haptics->wksrc, "vibrator");
 	mutex_init(&haptics->lock);
 
 	return 0;
