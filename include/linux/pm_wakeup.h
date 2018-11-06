@@ -108,10 +108,13 @@ extern void __pm_relax(struct wakeup_source *ws);
 extern void pm_relax(struct device *dev);
 extern void __pm_wakeup_event(struct wakeup_source *ws, unsigned int msec);
 extern void pm_wakeup_event(struct device *dev, unsigned int msec);
-
-static inline int wakeup_active(struct wakeup_source *wakeup)
+static inline int __wakeup_active(struct wakeup_source *wakeup)
 {
 	return wakeup->active;
+}
+static inline int wakeup_active(struct device *dev)
+{
+	return dev->power.wakeup->active;
 }
 
 #else /* !CONFIG_PM_SLEEP */
