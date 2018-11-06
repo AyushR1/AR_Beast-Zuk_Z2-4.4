@@ -103,7 +103,6 @@ build_package
 make_name
 copy_out
 turn_back
-clean
 DIFF=$(($BUILD_END - $BUILD_START))
 echo -e "$yellow****************************************************************************"
 echo -e "$cyan Build completed in $(($DIFF / 60)) minute(s) and $(($DIFF % 60)) seconds.$nocol"
