@@ -307,7 +307,7 @@ static irqreturn_t cclogic_irq(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	pm_wakeup_event(cclogic_dev->dev, msecs_to_jiffies(1000));
+	__pm_wakeup_event(&cclogic_dev->wakeup, msecs_to_jiffies(1000));
 
 	cancel_delayed_work(&cclogic_dev->work);
 	schedule_delayed_work(&cclogic_dev->work, 0);
@@ -329,7 +329,7 @@ static irqreturn_t cclogic_plug_irq(int irq, void *data)
 	}
 
 	pm_runtime_get(cclogic_dev->dev);
-	pm_wakeup_event(cclogic_dev->dev, msecs_to_jiffies(10000));
+	__pm_wakeup_event(&cclogic_dev->wakeup, msecs_to_jiffies(1000));
 
 	m_plug_state = 1;
 
@@ -1187,7 +1187,7 @@ int cclogic_register(struct cclogic_chip *c)
 	}
 
 	pm_runtime_get_sync(cclogic_priv->dev);
-	pm_wakeup_event(cclogic_priv->dev, msecs_to_jiffies(1000));
+	__pm_wakeup_event(&cclogic_priv->wakeup_plug, msecs_to_jiffies(100));
 	mdelay(100);
 	
 	mutex_lock(&cclogic_ops_lock);
@@ -1433,6 +1433,11 @@ static int cclogic_probe(struct i2c_client *client,
 		dev_err(&client->dev, "%s-->irq plug gpio not provided\n",__func__);
 		goto err_irq_working_dir;
 	}
+
+
+	wakeup_source_init(&cclogic_dev->wakeup, "cclogic_wakeup");
+	wakeup_source_init(&cclogic_dev->wakeup_plug, "cclogic_wakeup_plug");
+
 	device_init_wakeup(cclogic_dev->dev, 1);
 
 	INIT_DELAYED_WORK(&cclogic_dev->work, cclogic_do_work);
@@ -1486,6 +1491,8 @@ err_irq_req:
 	sysfs_remove_group(&client->dev.kobj, &cclogic_attr_group);
 err_chip_check:	
 	device_init_wakeup(cclogic_dev->dev, 0);
+	wakeup_source_trash(&cclogic_dev->wakeup);
+	wakeup_source_trash(&cclogic_dev->wakeup_plug);
 err_irq_plug_dir:
 	if (gpio_is_valid(platform_data->irq_plug))
 		gpio_free(platform_data->irq_plug);
@@ -1524,6 +1531,8 @@ static int cclogic_remove(struct i2c_client *client)
 	sysfs_remove_group(&client->dev.kobj, &cclogic_attr_group);
 
 	device_init_wakeup(cclogic_dev->dev, 0);
+	wakeup_source_trash(&cclogic_dev->wakeup);
+	wakeup_source_trash(&cclogic_dev->wakeup_plug);
 
 	cancel_delayed_work_sync(&cclogic_dev->work);	
 	cancel_delayed_work_sync(&cclogic_dev->plug_work);
