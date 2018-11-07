@@ -904,10 +904,10 @@ static void cclogic_do_plug_work(struct work_struct *w)
 
 	if(m_plug_state){
 		if(gpio_get_value(pdata->platform_data->irq_plug)){
-			if(retries < 5){
+			if(retries < 10){
 				retries++;
 				schedule_delayed_work(&pdata->plug_work,
-									  msecs_to_jiffies(10 * retries));
+									  msecs_to_jiffies(100));
 			}else{
 				m_plug_state = 0;
 				cancel_delayed_work(&cclogic_priv->work);
