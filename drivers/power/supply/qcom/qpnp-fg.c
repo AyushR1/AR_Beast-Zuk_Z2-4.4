@@ -290,7 +290,7 @@ static struct fg_mem_data fg_data[FG_DATA_MAX] = {
 	DATA(BATT_ID_INFO,    0x594,   3,      1,     -EINVAL),
 };
 
-static int fg_debug_mask;
+static int fg_debug_mask = true;
 module_param_named(
 	debug_mask, fg_debug_mask, int, S_IRUSR | S_IWUSR
 );
