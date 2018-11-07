@@ -37,6 +37,11 @@
 #include <linux/alarmtimer.h>
 #include <linux/qpnp/qpnp-revid.h>
 
+#ifdef CONFIG_MACH_ZUK
+#define SUPPORT_BATT_ID_RECHECK
+#define LENUK_FIX_WARM_CAP_LEARNING_PROCESS
+#endif
+
 /* Register offsets */
 
 /* Interrupt offsets */
@@ -60,6 +65,9 @@
 #define MSB_SIGN		BIT(7)
 #define IBAT_VBAT_MASK		0x7F
 #define NO_OTP_PROF_RELOAD	BIT(6)
+#ifdef SUPPORT_BATT_ID_RECHECK
+#define REDO_BATID_DURING_FIRST_EST	BIT(4)
+#endif
 #define REDO_FIRST_ESTIMATE	BIT(3)
 #define RESTART_GO		BIT(0)
 #define THERM_DELAY_MASK	0xE0
@@ -528,6 +536,9 @@ struct fg_chip {
 	bool			esr_pulse_tune_en;
 	ktime_t 		soc_kt;
 	u8	 		is_op_soc;
+#ifdef SUPPORT_BATT_ID_RECHECK
+	int			batt_id_redo;
+#endif
 };
 
 /* FG_MEMIF DEBUGFS structures */
@@ -633,7 +644,7 @@ static int fg_write(struct fg_chip *chip, u8 *val, u16 addr, int len)
 	if (!rc && (fg_debug_mask & FG_SPMI_DEBUG_WRITES)) {
 		str[0] = '\0';
 		fill_string(str, DEBUG_PRINT_BUFFER_SIZE, val, len);
-		pr_info("write(0x%04X), sid=%d, len=%d; %s\n",
+		pr_debug("write(0x%04X), sid=%d, len=%d; %s\n",
 			addr, to_spmi_device(pdev->dev.parent)->usid, len,
 			str);
 	}
@@ -2072,8 +2083,10 @@ static void update_sram_data(struct fg_chip *chip, int *resched_ms)
 
 	fg_mem_lock(chip);
 	for (i = 1; i < FG_DATA_MAX; i++) {
+#ifndef SUPPORT_BATT_ID_RECHECK
 		if (chip->profile_loaded && i >= FG_DATA_BATT_ID)
 			continue;
+#endif
 		rc = fg_mem_read(chip, reg, fg_data[i].address,
 			fg_data[i].len, fg_data[i].offset, 0);
 		if (rc) {
@@ -3140,6 +3153,14 @@ static void fg_cap_learning_save_data(struct fg_chip *chip)
 static void fg_cap_learning_post_process(struct fg_chip *chip)
 {
 	int64_t max_inc_val, min_dec_val, old_cap;
+
+#ifdef LENUK_FIX_WARM_CAP_LEARNING_PROCESS
+	int capacity = get_prop_capacity(chip);
+	if (capacity < 99) {
+		pr_err("( soc %d < 99) Stop capacity learning process!\n", capacity);
+		return;
+	}
+#endif
 
 	max_inc_val = chip->learning_data.learned_cc_uah
 			* (1000 + chip->learning_data.max_increment);
@@ -4691,7 +4712,14 @@ try_again:
 	}
 
 	/* unset the restart bits so the fg doesn't continuously restart */
+#ifdef SUPPORT_BATT_ID_RECHECK
+	if (chip->batt_id_redo == 1)
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO | REDO_BATID_DURING_FIRST_EST;
+	else
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#else
 	reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#endif
 	rc = fg_masked_write(chip, chip->soc_base + SOC_RESTART,
 			reg, 0, 1);
 	if (rc) {
@@ -4787,7 +4815,14 @@ try_again:
 		goto fail;
 	}
 
+#ifdef SUPPORT_BATT_ID_RECHECK
+	if (chip->batt_id_redo == 1)
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO | REDO_BATID_DURING_FIRST_EST;
+	else
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#else
 	reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#endif
 	rc = fg_masked_write(chip, chip->soc_base + SOC_RESTART,
 			reg, reg, 1);
 	if (rc) {
@@ -4819,7 +4854,14 @@ try_again:
 		goto fail;
 	}
 	/* unset the restart bits so the fg doesn't continuously restart */
+#ifdef SUPPORT_BATT_ID_RECHECK
+	if (chip->batt_id_redo == 1)
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO | REDO_BATID_DURING_FIRST_EST;
+	else
+		reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#else
 	reg = REDO_FIRST_ESTIMATE | RESTART_GO;
+#endif
 	rc = fg_masked_write(chip, chip->soc_base + SOC_RESTART,
 			reg, 0, 1);
 	if (rc) {
@@ -4867,6 +4909,23 @@ fail:
 	chip->fg_restarting = false;
 	return -EINVAL;
 }
+
+#ifdef SUPPORT_BATT_ID_RECHECK
+static int batt_id_is_vaild(int bid)
+{
+#if defined CONFIG_MACH_ZUK_Z2_PLUS
+	if (((bid >= 1000) && (bid < 20000))
+			|| ((bid >= 20000) && (bid < 80000)))
+#else
+	if (((bid >= 20000) && (bid < 38000))
+			|| ((bid >= 38000) && (bid < 80000)))
+
+#endif
+		return 1;
+	else
+		return 0;
+}
+#endif
 
 #define FG_PROFILE_LEN			128
 #define PROFILE_COMPARE_LEN		32
@@ -4920,6 +4979,21 @@ wait:
 			goto no_profile;
 		}
 	}
+
+#ifdef SUPPORT_BATT_ID_RECHECK
+	if ((!batt_id_is_vaild(get_sram_prop_now(chip, FG_DATA_BATT_ID)))
+		&& (chip->batt_id_redo == -1)) {
+		pr_info("battery id is invaild, do fg reset\n");
+		chip->batt_id_redo = 1;
+		rc = fg_do_restart(chip, false);
+		chip->batt_id_redo = 0;
+		if (rc) {
+			pr_err("restart failed, cannot get new battery id: %d\n", rc);
+			goto no_profile;
+		}
+		goto reschedule;
+	}
+#endif
 
 	/* read rslow compensation values if they're available */
 	rc = of_property_read_u32(profile_node, "qcom,chg-rs-to-rslow",
@@ -6770,6 +6844,10 @@ static int fg_probe(struct platform_device *pdev)
 
 	chip->pdev = pdev;
 	chip->dev = &(pdev->dev);
+
+#ifdef SUPPORT_BATT_ID_RECHECK
+	chip->batt_id_redo = -1;
+#endif
 
 	wakeup_source_init(&chip->empty_check_wakeup_source.source,
 			"qpnp_fg_empty_check");
