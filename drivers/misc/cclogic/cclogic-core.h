@@ -3,7 +3,7 @@
 
 #include "cclogic-class.h"
 
-//#define DEBUG
+#define DEBUG
 
 #define DEV_STAGE_DEBUG 
 #define CCLOGIC_UPDATE_REAL_STATUS
@@ -119,6 +119,8 @@ struct cclogic_dev	{
 	struct delayed_work	work;
 	struct delayed_work	plug_work;
 	struct cclogic_platform *platform_data;
+	struct wakeup_source 	wakeup;
+	struct wakeup_source 	wakeup_plug;
 	bool			vbus_on;
 	struct cclogic_chip *ops;
 	struct cclogic_state state;

@@ -307,8 +307,7 @@ static irqreturn_t cclogic_irq(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	pm_wakeup_event(cclogic_dev->dev, msecs_to_jiffies(1000));
-
+	__pm_wakeup_event(&cclogic_dev->wakeup, msecs_to_jiffies(1000));
 	cancel_delayed_work(&cclogic_dev->work);
 	schedule_delayed_work(&cclogic_dev->work, 0);
 
@@ -328,7 +327,8 @@ static irqreturn_t cclogic_plug_irq(int irq, void *data)
 		return IRQ_HANDLED;
 	}
 
-	pm_wakeup_event(cclogic_dev->dev, msecs_to_jiffies(10000));
+	pm_runtime_get(cclogic_dev->dev);
+	__pm_wakeup_event(&cclogic_dev->wakeup_plug, msecs_to_jiffies(1000));
 
 	m_plug_state = 1;
 
@@ -543,19 +543,23 @@ static ssize_t cclogic_show_status(struct device *dev,
 	pr_debug("[%s][%d]\n", __func__, __LINE__);
 
 #ifdef CCLOGIC_UPDATE_REAL_STATUS
+	pm_runtime_get_sync(dev);
 	mutex_lock(&cclogic_ops_lock);
 	if(cclogic_dev->ops && cclogic_dev->ops->get_state){
 		ret = cclogic_dev->ops->get_state(cclogic_dev->i2c_client,
 				&cclogic_dev->state);
 		if(ret){
 			mutex_unlock(&cclogic_ops_lock);
+			pm_runtime_put(dev);
 			return sprintf(buf, "error\n"); 
 		}
 	}else{
 		mutex_unlock(&cclogic_ops_lock);
+		pm_runtime_put(dev);
 		return sprintf(buf, "no chip\n");	
 	}
 	mutex_unlock(&cclogic_ops_lock);
+	pm_runtime_put(dev);
 
 #endif
 	cclogic_patch_state(cclogic_dev);
@@ -858,6 +862,10 @@ static void cclogic_do_work(struct work_struct *w)
 
 	pr_debug("[%s][%d]\n", __func__, __LINE__);
 
+	if(pm_runtime_suspended(pdata->dev)){
+		return;
+	}
+
 	mutex_lock(&cclogic_ops_lock);
 
 	ret = pdata->ops->get_state(pdata->i2c_client,&pdata->state);
@@ -881,12 +889,14 @@ work_end:
 	if(ret || !gpio_get_value(cclogic_priv->platform_data->irq_working)){
 		retries++;
 		if(retries <= CCLOGIC_MAX_RETRIES){
-			schedule_delayed_work(&pdata->work, msecs_to_jiffies(20 * retries));
+			schedule_delayed_work(&pdata->work, msecs_to_jiffies(100));
 			return;
 		}else
 			pr_err("[%s][%d] still in error,more than %d retries\n", __func__, __LINE__,CCLOGIC_MAX_RETRIES);
 	}
 
+
+	__pm_relax(&pdata->wakeup);
 	retries = 0;
 }
 
@@ -904,10 +914,9 @@ static void cclogic_do_plug_work(struct work_struct *w)
 
 	if(m_plug_state){
 		if(gpio_get_value(pdata->platform_data->irq_plug)){
-			if(retries < 10){
+			if(retries<10){
 				retries++;
-				schedule_delayed_work(&pdata->plug_work,
-									  msecs_to_jiffies(20 * retries));
+				schedule_delayed_work(&pdata->plug_work, msecs_to_jiffies(100));
 			}else{
 				m_plug_state = 0;
 				cancel_delayed_work(&cclogic_priv->work);
@@ -916,12 +925,17 @@ static void cclogic_do_plug_work(struct work_struct *w)
 				cclogic_func_set(p,CCLOGIC_FUNC_UART);
 				cclogic_patch_state(pdata);
 				retries = 0;
+				pm_runtime_put(pdata->dev);
+				__pm_relax(&cclogic_priv->wakeup_plug);
 			}
 		}else{
 			retries = 0;
+			__pm_relax(&cclogic_priv->wakeup_plug);
 		}
 	}else{
 		retries = 0;
+		pm_runtime_put(pdata->dev);
+		__pm_relax(&cclogic_priv->wakeup_plug);
 	}
 }
 
@@ -1175,7 +1189,8 @@ int cclogic_register(struct cclogic_chip *c)
 		return -ENODEV;
 	}
 
-	pm_wakeup_event(cclogic_priv->dev, msecs_to_jiffies(1000));
+	pm_runtime_get_sync(cclogic_priv->dev);
+	__pm_wakeup_event(&cclogic_priv->wakeup_plug, msecs_to_jiffies(1000));
 	mdelay(100);
 	
 	mutex_lock(&cclogic_ops_lock);
@@ -1225,6 +1240,7 @@ int cclogic_register(struct cclogic_chip *c)
 err_ret:
 	mutex_unlock(&cclogic_ops_lock);
 err_ret1:
+	pm_runtime_put(cclogic_priv->dev);
 	return ret;
 }
 EXPORT_SYMBOL(cclogic_register);
@@ -1246,6 +1262,9 @@ void cclogic_unregister(struct cclogic_chip *c)
 	flush_delayed_work(&cclogic_priv->plug_work);	
 
 	cclogic_irq_enable(cclogic_priv,false);
+
+	__pm_relax(&cclogic_priv->wakeup);
+	pm_runtime_put(cclogic_priv->dev);
 
 	mutex_lock(&cclogic_ops_lock);
 	cclogic_priv->ops = NULL;
@@ -1352,6 +1371,8 @@ static int cclogic_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client,cclogic_dev);
 
+	pm_runtime_set_suspended(&client->dev);
+
 	ret = cclogic_regulator_configure(cclogic_dev, true);
 	if (ret < 0) {
 		dev_err(&client->dev, "%s-->Failed to configure regulators\n",
@@ -1370,6 +1391,8 @@ static int cclogic_probe(struct i2c_client *client,
 		dev_err(&client->dev,"%s-->error in set gpio\n",__func__);
 		goto err_regulator_on;
 	}
+
+	pm_runtime_enable(&client->dev);
 
 	if (gpio_is_valid(platform_data->irq_working)) {
 		/* configure cclogic irq working */
@@ -1414,6 +1437,11 @@ static int cclogic_probe(struct i2c_client *client,
 		dev_err(&client->dev, "%s-->irq plug gpio not provided\n",__func__);
 		goto err_irq_working_dir;
 	}
+
+
+	wakeup_source_init(&cclogic_dev->wakeup, "cclogic_wakeup");
+	wakeup_source_init(&cclogic_dev->wakeup_plug, "cclogic_wakeup_plug");
+
 	device_init_wakeup(cclogic_dev->dev, 1);
 
 	INIT_DELAYED_WORK(&cclogic_dev->work, cclogic_do_work);
@@ -1469,6 +1497,8 @@ err_irq_req:
 	sysfs_remove_group(&client->dev.kobj, &cclogic_attr_group);
 err_chip_check:	
 	device_init_wakeup(cclogic_dev->dev, 0);
+	wakeup_source_trash(&cclogic_dev->wakeup);
+	wakeup_source_trash(&cclogic_dev->wakeup_plug);
 err_irq_plug_dir:
 	if (gpio_is_valid(platform_data->irq_plug))
 		gpio_free(platform_data->irq_plug);
@@ -1507,6 +1537,8 @@ static int cclogic_remove(struct i2c_client *client)
 	sysfs_remove_group(&client->dev.kobj, &cclogic_attr_group);
 
 	device_init_wakeup(cclogic_dev->dev, 0);
+	wakeup_source_trash(&cclogic_dev->wakeup);
+	wakeup_source_trash(&cclogic_dev->wakeup_plug);
 
 	cancel_delayed_work_sync(&cclogic_dev->work);	
 	cancel_delayed_work_sync(&cclogic_dev->plug_work);
@@ -1535,6 +1567,9 @@ static int cclogic_remove(struct i2c_client *client)
 	cclogic_power_on(cclogic_dev, false);
 
 	cclogic_regulator_configure(cclogic_dev, false);
+
+        pm_runtime_disable(&client->dev);
+        pm_runtime_set_suspended(&client->dev);
 
 	return 0;
 }
