@@ -22,11 +22,13 @@ KERNEL_DIR=`pwd`
 HOME="/home/ayushr1"
 anykernel="$HOME/AR_Beast/ARB-Anykernel2"
 TOOLCHAIN_PATH="${HOME}/AR_Beast/linaro/bin"
+TOOLCHAIN_PATH_2="${HOME}/AR_Beast/linaroe/bin"
 CONFIG_FILE="ARB_z2_plus_defconfig"
 THREAD="-j$(nproc --all)"
 ZIMAGE="$KERNEL_DIR/arch/$ARCH/boot/Image.gz-dtb"
 CCACHE=$(command -v ccache)
 CROSS_COMPILE="aarch64-linux-gnu-"
+CONFIG_CROSS_COMPILE_ARM32="arm-linux-gnueabi-"
 CLANG_TC="$HOME/AR_Beast/dtc/bin/clang-8"
 CLANG_VERSION="Dragon-TC 9.0"
 
@@ -35,6 +37,7 @@ prefix() {
          make CC="${CCACHE} ${CLANG_TC}" \
              CLANG_TRIPLE=aarch64-linux-gnu- \
              CROSS_COMPILE=${TOOLCHAIN_PATH}/${CROSS_COMPILE} \
+             CROSS_COMPILE_ARM32=${TOOLCHAIN_PATH_2}/${CONFIG_CROSS_COMPILE_ARM32} \
              KBUILD_COMPILER_STRING="${CLANG_VERSION}" \
              HOSTCC="${CLANG_TC}" \
              $@ 
