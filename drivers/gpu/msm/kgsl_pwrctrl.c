@@ -1343,7 +1343,7 @@ static ssize_t kgsl_pwrctrl_temp_show(struct device *dev,
 	if (id < 0)
 		goto done;
 
-	ret = sensor_get_temp(id, (long *)&temperature);
+	ret = sensor_get_temp(id, &temperature);
 	if (ret)
 		goto done;
 
