@@ -39,7 +39,6 @@
 #include <linux/qpnp/qpnp-revid.h>
 
 #ifdef CONFIG_MACH_ZUK
-#define SUPPORT_BATT_ID_RECHECK
 #define LENUK_FIX_WARM_CAP_LEARNING_PROCESS
 #endif
 
