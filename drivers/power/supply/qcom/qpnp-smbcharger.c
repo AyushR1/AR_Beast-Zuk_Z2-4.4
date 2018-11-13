@@ -5850,7 +5850,6 @@ static int smbchg_usb_get_property(struct power_supply *psy,
 	case POWER_SUPPLY_PROP_ONLINE:
 		val->intval = chip->usb_online;
 		break;
-	case POWER_SUPPLY_PROP_REAL_TYPE:
 	case POWER_SUPPLY_PROP_TYPE:
 		val->intval = chip->usb_psy_d.type;
 		break;
@@ -5911,7 +5910,6 @@ static enum power_supply_property smbchg_usb_properties[] = {
 	POWER_SUPPLY_PROP_PRESENT,
 	POWER_SUPPLY_PROP_ONLINE,
 	POWER_SUPPLY_PROP_CURRENT_MAX,
-	POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_TYPE,
 	POWER_SUPPLY_PROP_REAL_TYPE,
 	POWER_SUPPLY_PROP_HEALTH,
