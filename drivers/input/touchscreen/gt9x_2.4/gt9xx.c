@@ -25,8 +25,6 @@
 	#include <linux/input/mt.h>
 #endif
 
-#define RETRY_MAX_TIMES 5
-
 static const char *goodix_ts_name = "goodix-ts";
 static const char *goodix_input_phys = "input/ts";
 static struct workqueue_struct *goodix_wq;
@@ -134,23 +132,12 @@ s32 gtp_i2c_read(struct i2c_client *client, u8 *buf, s32 len)
 		},
 	};
 
-	while (retries < RETRY_MAX_TIMES) {
+	for (retries = 0; retries < 5; retries++) {
 		ret = i2c_transfer(client->adapter, msgs, 2);
 		if (ret == 2)
 			break;
-		retries++;
+		dev_err(&client->dev, "I2C retry: %d\n", retries + 1);
 	}
-
-	if (retries >= RETRY_MAX_TIMES) {
-		/*  reset chip would quit doze mode */
-		if (doze_status == DOZE_ENABLED)
-			return ret;
-		dev_err(&client->dev,
-		"I2C Read: 0x%04X, %d bytes failed, errcode: %d! Process reset.",
-		(((u16)(buf[0] << 8)) | buf[1]), len-2, ret);
-		gtp_reset_guitar(client, 10);
-	}
-
 	return ret;
 }
 
@@ -171,8 +158,6 @@ Output:
 s32 gtp_i2c_write(struct i2c_client *client,u8 *buf,s32 len)
 {
 	int ret = -EIO;
-	u8 retries = 0;
-
 	struct i2c_msg msg = {
 		.flags = !I2C_M_RD,
 		.addr = client->addr,
@@ -180,22 +165,9 @@ s32 gtp_i2c_write(struct i2c_client *client,u8 *buf,s32 len)
 		.buf = buf,
 	};
 
-	while (retries < RETRY_MAX_TIMES) {
-		ret = i2c_transfer(client->adapter, &msg, 1);
-		if (ret == 1)
-			break;
-		retries++;
-	}
-
-	if (retries >= RETRY_MAX_TIMES) {
-		if (doze_status == DOZE_ENABLED)
-			return ret;
-		dev_err(&client->dev,
-		"I2C Write: 0x%04X, %d bytes failed, errcode: %d! Process reset.",
-		(((u16)(buf[0] << 8)) | buf[1]), len-2, ret);
-		gtp_reset_guitar(client, 10);
-	}
-
+	ret = i2c_transfer(client->adapter, &msg, 1);
+	if (ret != 1)
+		return -EINVAL;
 	return ret;
 }
 
