@@ -1738,9 +1738,9 @@ EXTRA_CFLAGS += -Wno-typedef-redefinition
 EXTRA_CFLAGS += -Wno-shift-count-overflow
 EXTRA_CFLAGS += -Wno-non-literal-null-conversion
 EXTRA_CFLAGS += -Wno-logical-not-parentheses
+EXTRA_CFLAGS += -Wno-unused-function
+EXTRA_CFLAGS += -Wno-unused-variable
 endif 
-EXTRA_CFLAGS += -Wno-unused-function -Wno-unused-variable -Wno-misleading-indentation
-
 
 # If the module name is not "wlan", then the define MULTI_IF_NAME to be the
 # same a the QCA CHIP name. The host driver will then append MULTI_IF_NAME to

@@ -1409,8 +1409,7 @@ static int cclogic_probe(struct i2c_client *client,
 	}
 
 	ret = request_threaded_irq(cclogic_dev->irq_working, NULL, cclogic_irq,
-			cclogic_dev->platform_data->irq_working_flags |
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT, DRIVER_NAME,
+			cclogic_dev->platform_data->irq_working_flags | IRQF_ONESHOT, DRIVER_NAME,
 			cclogic_dev);
 	if (ret) {
 		dev_err(&client->dev,
@@ -1420,8 +1419,7 @@ static int cclogic_probe(struct i2c_client *client,
 
 	if (gpio_is_valid(platform_data->irq_plug)) {
 		ret = request_threaded_irq(cclogic_dev->irq_plug, NULL, cclogic_plug_irq,
-				cclogic_dev->platform_data->irq_plug_flags |
-					IRQF_TRIGGER_RISING | IRQF_ONESHOT, DRIVER_NAME,
+				cclogic_dev->platform_data->irq_plug_flags | IRQF_ONESHOT, DRIVER_NAME,
 				cclogic_dev);
 		if (ret) {
 			dev_err(&client->dev,
@@ -1448,8 +1446,6 @@ err_irq_enable:
 	free_irq(cclogic_dev->irq_working, cclogic_dev);
 err_irq_req:
 	sysfs_remove_group(&client->dev.kobj, &cclogic_attr_group);
-err_chip_check:
-	device_init_wakeup(cclogic_dev->dev, 0);
 err_irq_plug_dir:
 	if (gpio_is_valid(platform_data->irq_plug))
 		gpio_free(platform_data->irq_plug);
