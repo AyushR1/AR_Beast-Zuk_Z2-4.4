@@ -2458,7 +2458,7 @@ static int __validate_layers(struct msm_fb_data_type *mfd,
 	if (ret)
 		return ret;
 
-	if (layer_count <= 0)
+	if (!layer_count)
 		goto validate_skip;
 
 	layer_list = commit->input_layers;
@@ -3270,3 +3270,4 @@ done:
 	mdss_mdp_clk_ctrl(MDP_BLOCK_POWER_OFF);
 	return rc;
 }
+
