@@ -36,8 +36,8 @@
 #include <trace/events/power.h>
 #include <linux/state_notifier.h>
 
-#define SCREEN_OFF_CEILING    960000
-
+#define SCREEN_OFF_CEILING    729600
+                              
 static LIST_HEAD(cpufreq_policy_list);
 
 static inline bool policy_is_inactive(struct cpufreq_policy *policy)
