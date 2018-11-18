@@ -675,7 +675,7 @@ ifdef CONFIG_CC_WERROR
 KBUILD_CFLAGS	+= -Werror
 endif
 
-KBUILD_CFLAGS += -ffast-math -funsafe-math-optimizations -fno-signed-zeros -freciprocal-math -ffp-contract=fast -mcpu=cortex-a73.cortex-a53 -mtune=cortex-a73.cortex-a53 -floop-nest-optimize -fgraphite-identity -ftree-loop-distribution
+KBUILD_CFLAGS += -ffast-math -funsafe-math-optimizations -fno-signed-zeros -mcpu=kryo -freciprocal-math -ffp-contract=fast
 
 # Tell gcc to never replace conditional load with a non-conditional one
 KBUILD_CFLAGS	+= $(call cc-option,--param=allow-store-data-races=0)
