@@ -2425,7 +2425,7 @@ static int cdrom_ioctl_select_disc(struct cdrom_device_info *cdi,
 		return -ENOSYS;
 
 	if (arg != CDSL_CURRENT && arg != CDSL_NONE) {
-		if (arg >= cdi->capacity)
+		if ((int)arg >= cdi->capacity)
 			return -EINVAL;
 	}
 
