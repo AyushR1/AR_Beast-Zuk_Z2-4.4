@@ -30,7 +30,7 @@ CCACHE=$(command -v ccache)
 CROSS_COMPILE="aarch64-linux-gnu-"
 CONFIG_CROSS_COMPILE_ARM32="arm-linux-gnueabi-"
 CLANG_TC="$HOME/AR_Beast/dtc/bin/clang-8"
-CLANG_VERSION="Dragon-TC 9.0"
+CLANG_VERSION="Dragon-TC 8.0.5"
 
 # Functions
 prefix() {
